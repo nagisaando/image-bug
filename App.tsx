@@ -1,23 +1,14 @@
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
-import { Button, StyleSheet, Text, View } from "react-native";
+import { Button, Image, StyleSheet, Text, View } from "react-native";
 import * as MediaLibrary from "expo-media-library";
-import * as ImageManipulator from "expo-image-manipulator";
 
 export default function App() {
   const [hasMediaLibraryPermission, setMediaLibraryPermissions] = useState<
     boolean | null
   >(null);
   const [isEmpty, setIsEmpty] = useState(false);
-  const [photos, setPhotos] = useState<{
-    assets: MediaLibrary.Asset[];
-    endCursor: string | undefined;
-    hasNextPage: boolean;
-  }>({
-    assets: [] as MediaLibrary.Asset[],
-    endCursor: undefined,
-    hasNextPage: true,
-  });
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   useEffect(() => {
     async function initialize() {
@@ -26,76 +17,61 @@ export default function App() {
     initialize();
   }, []);
 
-  useEffect(() => {
-    async function initialize() {
-      if (hasMediaLibraryPermission) {
-        await getPhotos();
-      }
-    }
-    initialize();
-  }, [hasMediaLibraryPermission]);
-
   const getPermissionsAsync = async (): Promise<void> => {
-    const result = await MediaLibrary.requestPermissionsAsync(undefined, [
-      "photo",
-    ]);
+    const result = await MediaLibrary.requestPermissionsAsync();
     setMediaLibraryPermissions(result.status === "granted");
   };
 
   const getPhotos = async (): Promise<void> => {
     if (hasMediaLibraryPermission) {
-      if (!photos.hasNextPage) {
-        return;
-      }
       const photoData = await MediaLibrary.getAssetsAsync({
-        first: 50,
-        after: photos.endCursor,
-        sortBy: [MediaLibrary.SortBy?.creationTime],
+        first: 1, // Fetch only the first image
+        sortBy: [MediaLibrary.SortBy.creationTime],
       });
 
-      if (photoData?.totalCount) {
-        if (photoData.endCursor === photos.endCursor) {
-          return;
-        }
-        setPhotos({
-          assets: [...photos.assets, ...photoData.assets],
-          endCursor:
-            photoData?.endCursor?.trim()?.length > 0
-              ? photoData?.endCursor
-              : undefined,
-          hasNextPage: photoData.hasNextPage,
-        });
-      } else {
-        setIsEmpty(true);
-      }
-    }
-  };
+      // ==================================================
+      // we can not use uri from getAssetsAsync
+      // this code is to demonstrate the error
+      // please comment this and uncomment the below code
+      if (photoData.assets.length > 0) setPhotoUri(photoData.assets[0].uri);
+      // ==================================================
 
-  const demonstrateFailure = async () => {
-    const result = await ImageManipulator.manipulateAsync(
-      photos?.assets[0].uri,
-      [{ resize: { width: 1000 } }],
-      {
-        compress: 0.8,
-        format: ImageManipulator.SaveFormat.PNG,
-      }
-    );
-    console.log("result!: ", result);
+      // ==================================================
+      // comment if (photoData.assets.length > 0) setPhotoUri(photoData.assets[0].uri); and uncomment below code
+      // we can display the photo without error
+
+      // if (photoData.assets.length > 0) {
+      //   const assetInfo = await MediaLibrary.getAssetInfoAsync(
+      //     photoData.assets[0].id
+      //   );
+      //   setPhotoUri(assetInfo.localUri || assetInfo.uri);
+      // } else {
+      //   setIsEmpty(true);
+      // }
+      // ==================================================
+    }
   };
 
   return (
     <View style={styles.container}>
       <Button
-        title="Demonstrate failure"
-        disabled={isEmpty || !hasMediaLibraryPermission}
-        onPress={() => demonstrateFailure()}
+        title="Get photo"
+        disabled={!hasMediaLibraryPermission}
+        onPress={getPhotos}
       />
       <StatusBar style="auto" />
       {isEmpty || !hasMediaLibraryPermission ? (
         <Text>
           Add photos to library to enable button and set media access.
         </Text>
-      ) : null}
+      ) : (
+        photoUri && (
+          <Image
+            style={{ width: 500, height: 500 }}
+            source={{ uri: photoUri }}
+          />
+        )
+      )}
     </View>
   );
 }
